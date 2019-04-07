@@ -83,3 +83,4 @@ Then write your html like this:
 * Verify that `vueify.js` loads after `vue.js` and `*.vue`.
 * No custom lang support ~~lang="coffee"~~ in .vue.
 * Refer TODOs in source code for future improvements.
+* Contributions are welcome! Just submit a PR ;)
