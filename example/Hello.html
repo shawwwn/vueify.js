@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset='utf-8'>
+		<meta n:00ame="viewport" content="width=device-width, initial-scale=1.0">
+		<meta http-equiv="X-UA-Compatible" content="ie=edge">
+		<title>VueifyJS: Hello World</title>
+	</head>
+
+	<body>
+		<p>Below should display 'Hello world!'</p>
+		<div id="components-demo">
+			<Hello></Hello>
+		</div>
+	</body>
+
+	<script src="https://vuejs.org/js/vue.js"></script>
+	<script src="Hello.vue" type='vue'></script>
+	<script src="vueify.js"></script>
+	<script type="text/javascript">
+		var app = new Vue({ 
+			el: '#components-demo'
+		});
+	</script>
+</html>
+
