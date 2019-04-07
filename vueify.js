@@ -25,7 +25,7 @@ function parseSFCName(url) {
 	if (fn) {
 		let m = fn.match(/^([a-z][-_a-z0-9]*)(\.vue)?$/i);
 		if (m) {
-			return m[1].replace(/-/g, "_").toLowerCase();
+			return m[1].toLowerCase();
 		}
 	}
 	delete loc;
