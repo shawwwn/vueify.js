@@ -66,13 +66,12 @@ function getSFCName(url) {
 
 /**
  * Generate a random scope id
- * TODO: Not doing accounting atm.
- *       Just hopping numbers are large enough thus won't collide. ;)
  * @return {string}
  */
 function genScopeId() {
 	var p1 = ((new Date).getTime() % 65535).toString(16).padStart(4, '0');
 	var p2 = Math.ceil(Math.random() * 65535).toString(16).padStart(4, '0');
+	// TODO: record generated scopeIds so they don't collide
 	return `data-v-${p1}${p2}`;
 }
 
@@ -219,9 +218,6 @@ async function preprocessCSS(css) {
 	var _cssText = "";
 	var tmp_iframe = null; // to temporarily hold and parse css text
 
-	// TODO: Allow mixing scoped/non-scoped styles
-	// TODO: Below only works for newest chrome.
-	//       Use <style> injection for cross-browser compatibility
 	await Promise.all(css.map(async (el, i) => {
 
 		// scoped style
@@ -269,18 +265,10 @@ async function preprocessCSS(css) {
 			_cssText += el.txt + '\n';
 		}
 
-		// import external file via 'src' attribute
-		// if (el.dom.hasAttribute('src')) {
-		// 	var l = document.createElement('link');
-		// 	l.href = el.dom.getAttribute('src');
-		// 	l.type = "text/css";
-		// 	l.rel = "stylesheet";
-		// 	document.head.appendChild(l);
-		// 	// TODO: ajax load and add scope to css file
-		// }
 	}));
 
 	// inject cssText
+	// TODO: inject cssText in final export script
 	var _cssDom = document.createElement('style');
 	_cssDom.innerHTML = _cssText;
 	document.body.appendChild(_cssDom);
@@ -301,7 +289,6 @@ async function preprocessHTML(html) {
 	var _templateText = html.reduce((accu, cv) => {
 		return accu + cv.txt;
 	}, '');  // combine all templates
-	// TODO: import external template file via 'src' attribute
 
 	html.templateText = _templateText.trim();
 	return html;
