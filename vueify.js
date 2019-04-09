@@ -36,6 +36,8 @@ function getContent(url, callback) {
  * @param {function(string)} callback
  */
 function resolveUrl(path) {
+	console.log("xxxxxxxxxxxxxxxxxxxxxxxxxxx")
+	console.log(path);
 	var url = path;
 	return url;
 }
@@ -286,7 +288,7 @@ async function preprocessJS(js) {
 	}, '');
 	// TODO: import external js file via 'src' attribute
 
-	const re = /import .+ from "(.*\.vue)"/g
+	const re = /import .+ from ['"`](.*\.vue)["'`]/g
 
 	// first generate a dict for url transforms
 	let matches = Array.from(_jsText.matchAll(re))
@@ -307,9 +309,9 @@ async function preprocessJS(js) {
 	}));
 
 	// replace source code using the dict
-	_jsText.replace(re, (txt, path, pos) => {
+	_jsText = _jsText.replace(re, (txt, path, pos) => {
 		new_txt = txt.replace(path, url_dict[path])
-		console.log(`${txt} ====> ${new_txt}`)
+		console.log(`${txt} ====> ${new_txt}`) // DEBUG
 		return new_txt;
 	});
 

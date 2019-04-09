@@ -4,18 +4,18 @@
 		<meta charset='utf-8'>
 		<meta n:00ame="viewport" content="width=device-width, initial-scale=1.0">
 		<meta http-equiv="X-UA-Compatible" content="ie=edge">
-		<title>VueifyJS: Hello World</title>
+		<title>VueifyJS: Nested Components</title>
 	</head>
 
 	<body>
-		<p>Below should display <u>Hello world!</u>.</p>
+		<p>Below should display <u>Hello world!</u> in red, inside a div with <u>green border</u>.</p>
 		<div id="components-demo">
-			<Hello></Hello>
+			<nested></nested>
 		</div>
 	</body>
 
 	<script src="https://vuejs.org/js/vue.js"></script>
-	<script src="Hello.vue" type='vue'></script>
+	<script src="Nested.vue" type='vue'></script>
 	<script src="vueify.js"></script>
 	<script type="text/javascript">
 		var app = new Vue({ 
