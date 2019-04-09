@@ -36,8 +36,6 @@ function getContent(url, callback) {
  * @param {function(string)} callback
  */
 function resolveUrl(path) {
-	console.log("xxxxxxxxxxxxxxxxxxxxxxxxxxx")
-	console.log(path);
 	var url = path;
 	return url;
 }
