@@ -217,36 +217,49 @@ async function parseSFC(sfc_src) {
 async function preprocessCSS(css) {
 	var _scopeId = null;
 	var _cssText = "";
+	var tmp_iframe = null; // to temporarily hold and parse css text
 
 	// TODO: Allow mixing scoped/non-scoped styles
 	// TODO: Below only works for newest chrome.
 	//       Use <style> injection for cross-browser compatibility
 	css.forEach((el, i) => {
 
-		// generate scopeId
-		if (!_scopeId && el.dom.hasAttribute('scoped')) {
-			_scopeId = genScopeId();
-			console.log("scopeId:", _scopeId); // DEBUG
+		// scoped style
+		if (el.dom.hasAttribute('scoped')) {
+			// generate scopeId
+			if (!_scopeId) {
+				_scopeId = genScopeId();
+				console.log("scopeId:", _scopeId); // DEBUG
+			}
+
+			// create temporary iframe to hold & parse css text
+			if (!tmp_iframe) {
+				tmp_iframe = document.createElement('iframe');
+				tmp_iframe.style.cssText="display: none;"
+				document.body.appendChild(tmp_iframe);
+			}
+
+			let s = tmp_iframe.contentDocument.createElement('style');
+			s.innerHTML = el.txt;
+			tmp_iframe.contentDocument.head.appendChild(s);
+			let rules = s.sheet.rules;
+			for (let i=0; i<rules.length; i++) {
+
+				// add scopeId to each css
+				if (_scopeId) {
+					rules[i].selectorText += `[${_scopeId}]`;
+				}
+
+				_cssText += rules[i].cssText + '\n';
+			}
+			s.remove();
+		} else {
+			_cssText += el.txt + '\n';
 		}
-
-		let src = el.txt;
-		let sheet = new CSSStyleSheet(); // TODO: only works in chrome
-		sheet.replaceSync(src); // TODO: only works in chrome
-
-		if (_scopeId) {
-			// add scopeId to each css
-			keys = Object.keys(sheet.rules);
-			keys.forEach((key, j) => {
-				sheet.rules[key].selectorText += `[${_scopeId}]`;
-			});
-		}
-
-		document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet]; // TODO: only works in chrome
-		console.log("style appended:", sheet); // DEBUG
 
 		// import external file via 'src' attribute
 		if (el.dom.hasAttribute('src')) {
-			var l = document.createElement("link");
+			var l = document.createElement('link');
 			l.href = el.dom.getAttribute('src');
 			l.type = "text/css";
 			l.rel = "stylesheet";
@@ -255,6 +268,13 @@ async function preprocessCSS(css) {
 		}
 	});
 
+	// inject cssText
+	var _cssDom = document.createElement('style');
+	_cssDom.innerHTML = _cssText;
+	document.body.appendChild(_cssDom);
+
+	tmp_iframe.remove()
+	css.cssDom = _cssDom;
 	css.scopeId = _scopeId;
 	css.cssText = _cssText;
 	return css;
