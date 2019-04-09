@@ -222,7 +222,7 @@ async function preprocessCSS(css) {
 	// TODO: Allow mixing scoped/non-scoped styles
 	// TODO: Below only works for newest chrome.
 	//       Use <style> injection for cross-browser compatibility
-	css.forEach((el, i) => {
+	await Promise.all(css.map(async (el, i) => {
 
 		// scoped style
 		if (el.dom.hasAttribute('scoped')) {
@@ -239,8 +239,20 @@ async function preprocessCSS(css) {
 				document.body.appendChild(tmp_iframe);
 			}
 
+			// download external css to process
+			let external_txt = "";
+			external_txt = await new Promise((resolve, reject) => {
+				if (el.dom.hasAttribute('src')) {
+					let path = el.dom.getAttribute('src');
+					getContent(resolveUrl(path), (content) => resolve(content));
+				} else {
+					resolve('');
+				}
+			});
+
+			// use browser to parse css text
 			let s = tmp_iframe.contentDocument.createElement('style');
-			s.innerHTML = el.txt;
+			s.innerHTML = el.txt + external_txt;
 			tmp_iframe.contentDocument.head.appendChild(s);
 			let rules = s.sheet.rules;
 			for (let i=0; i<rules.length; i++) {
@@ -258,22 +270,22 @@ async function preprocessCSS(css) {
 		}
 
 		// import external file via 'src' attribute
-		if (el.dom.hasAttribute('src')) {
-			var l = document.createElement('link');
-			l.href = el.dom.getAttribute('src');
-			l.type = "text/css";
-			l.rel = "stylesheet";
-			document.head.appendChild(l);
-			// TODO: ajax load and add scope to css file
-		}
-	});
+		// if (el.dom.hasAttribute('src')) {
+		// 	var l = document.createElement('link');
+		// 	l.href = el.dom.getAttribute('src');
+		// 	l.type = "text/css";
+		// 	l.rel = "stylesheet";
+		// 	document.head.appendChild(l);
+		// 	// TODO: ajax load and add scope to css file
+		// }
+	}));
 
 	// inject cssText
 	var _cssDom = document.createElement('style');
 	_cssDom.innerHTML = _cssText;
 	document.body.appendChild(_cssDom);
 
-	tmp_iframe.remove()
+	tmp_iframe.remove();
 	css.cssDom = _cssDom;
 	css.scopeId = _scopeId;
 	css.cssText = _cssText;
@@ -373,8 +385,16 @@ async function transpileSFC(sfc_src) {
 /**
  * Init 
  */
-var SFC = []; // DEBUG
+var Vueify = {
+	pendingSFCs: {}, // record unfinished downloads
+	rootSFCs: [],
+};
 function init() {
+
+	if (!Vue) {
+		console.error('VueifyJS: Need Vue to run.');
+		return;
+	}
 
 	/* Hook Vue's warnhandler */
 	const _warnHandler = Vue.config.warnHandler;
@@ -401,26 +421,40 @@ function init() {
 
 	/* Scan script tag for Vue's SFC */
 	findSFC(async (sfc_dom, sfc_url, sfc_name) => {
+
+		// register async component immediately
+		if (!Vueify.pendingSFCs[sfc_name]) {
+			Vue.component(sfc_name, (resolve, reject) => {
+				const wrapper = (func) => {
+					return (data) => {
+						func(data);
+						scanRoot((vue) => vue.$forceUpdate());
+					};
+				};
+				Vueify.pendingSFCs[sfc_name] = {
+					resolve: wrapper(resolve),
+					reject: wrapper(reject)
+				};
+			});
+		}
+
+		// wait for SFCs to load
 		var sfc_src = await downloadSFC(sfc_url);
 		var [sfc_code, sfc_obj] = await transpileSFC(sfc_src);
 		var [sfc_blob_url, sfc_blob] = await uploadSFC(sfc_code);
 
-		// assemble and apply self-executable js for root-level SFC
-		js_src = `
-			import ${sfc_name} from "${sfc_blob_url}";
-			Vue.component('${sfc_name}', ${sfc_name});
-			scanRoot((vue) => vue.$forceUpdate());
-		`;
-		var script = document.createElement('script');
-		script.type = 'module';
-		script.innerHTML = js_src;
-		document.body.appendChild(script);
+		// finish registering async component
+		var module = await import(sfc_blob_url);
+		console.log(module);
+		Vueify.pendingSFCs[sfc_name].resolve(module.default);
 
+		// clean up
+		delete Vueify.pendingSFCs[sfc_name];
 		sfc_dom.remove();
 
 		sfc_obj.sfc_blob = sfc_blob; // DEBUG
 		sfc_obj.sfc_blob_url = sfc_blob_url; // DEBUG
-		SFC.push(sfc_obj); // DEBUG
+		Vueify.rootSFCs.push(sfc_obj); // DEBUG
 	});
 }
 

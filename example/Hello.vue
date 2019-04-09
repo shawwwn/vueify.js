@@ -5,6 +5,8 @@
   }
 </style>
 
+<style src="./blue.css" scoped></style>
+
 <template>
   <h1 class="red">{{msg}}</h1>
 </template>

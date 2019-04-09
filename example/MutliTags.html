@@ -8,19 +8,19 @@
 	</head>
 
 	<body>
-		<p><i>Basic .vue loading from &lt;script&gt; tag</i></p>
+		<p><i>This example test the behavior of VueifyJS when a .vue has two or more &lt;style&gt; or &lt;script&gt; tags.</i></p>
 		<br>
-		<p>Below should display <u>Hello world!</u>.</p>
+		<p>The Hello message below should be from <u>external</u> script</p>
 		<div id="components-demo">
-			<Hello></Hello>
+			<MultiTags></MultiTags>
 		</div>
 	</body>
 
 	<script src="https://vuejs.org/js/vue.js"></script>
-	<script src="Hello.vue" type='vue'></script>
+	<script src="MultiTags.vue" type='vue'></script>
 	<script src="vueify.js"></script>
 	<script type="text/javascript">
-		var app = new Vue({ 
+		var app = new Vue({
 			el: '#components-demo'
 		});
 	</script>
