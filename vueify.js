@@ -4,57 +4,9 @@
  * license.
  *
  * @summary Browser Loading Vue's Single-File-Component(SFC)
- * @version 0.1
+ * @version 0.2
  * @author Shawwwn <shawwwn1@gmail.com>
  */
-
-
-/**
- * Parse SFC's name from its url
- * @param {string} url
- */
-function parseSFCName(url) {
-	if (!url) {
-		return null;
-	} else {
-		url = String(url);
-	}
-	let loc = document.createElement('a');
-	loc.href = url;
-	let fn = loc.pathname.split('/').slice(-1)[0];
-	if (fn) {
-		let m = fn.match(/^([a-z][-_a-z0-9]*)(\.vue)?$/i);
-		if (m) {
-			return m[1].toLowerCase();
-		}
-	}
-	delete loc;
-	return null;
-};
-
-/**
- * Finds all Vue's SFCs in html
- * @param {function(dom, url, name)} callback
- */
-function findSFC(callback) {
-	var components = document.querySelectorAll("script");
-	if (components.length > 0) {
-		components.forEach((dom, i) => {
-			if (dom.type == 'vue') {
-				let url = dom.src;
-				let name = parseSFCName(dom.getAttribute('name'));
-				if (!name) {
-					name = parseSFCName(url);
-					if (!name) {
-						console.error('Unable to parse SFC name for', dom);
-						return;
-					}
-				}
-				callback(dom, url, name);
-			}
-		});
-	}
-}
 
 /**
  * Load contents of a remote file
@@ -74,31 +26,43 @@ function getContent(url, callback) {
 	xhr.send();
 }
 
-/**
- * Parse SFC file into individual(CSS/JS/HTML) tags
- * @param {string} content
- * @return {css, js, html}
- */
-function parseSFC(content) {
-	var doc = new DOMParser().parseFromString(content, 'text/html');
-	var ret = {
-		css: parse(doc.querySelectorAll("style")),
-		js: parse(doc.querySelectorAll("script")),
-		html: parse(doc.querySelectorAll("template"))
-	};
-	return ret;
+//
+// utils
+//
 
-	// extra src text from each tag
-	function parse(doms) {
-		return Array.from(doms).map((dom, j) => {
-			return {
-				dom: dom,
-				txt: dom.innerHTML,
-				src: dom.outerHTML
-			};
-		});
-	}
+/**
+ * Resolve relative path into url
+ * @param {string} url
+ * @param {function(string)} callback
+ */
+function resolveUrl(path) {
+	var url = path;
+	return url;
 }
+
+/**
+ * Attempt to get SFC's name from its url
+ * By default, SFC's name should be file name of the .vue
+ * @param {string} url
+ */
+function getSFCName(url) {
+	if (!url) {
+		return null;
+	} else {
+		url = String(url);
+	}
+	let loc = document.createElement('a');
+	loc.href = url;
+	let fn = loc.pathname.split('/').slice(-1)[0];
+	if (fn) {
+		let m = fn.match(/^([a-z][-_a-z0-9]*)(\.vue)?$/i);
+		if (m) {
+			return m[1].toLowerCase();
+		}
+	}
+	delete loc;
+	return null;
+};
 
 /**
  * Generate a random scope id
@@ -174,104 +138,274 @@ function scanRoot(callback) {
 	} /* end of walk() */
 }
 
-
 //
-// main
+// member
 //
-var SFC = []; // TODO: for debug only
-findSFC((sfc_dom, sfc_url, sfc_name) => {
-	getContent(sfc_url, (content) => {
-		console.log(sfc_url+'\n', content);
-		var parsed = parseSFC(content);
-		SFC.push(Object.assign(parsed, {
-			url: sfc_url,
-			name: sfc_name,
-			dom: sfc_dom,
-			txt: content,
-		})); // TODO: for debug only
-		var scoped = parsed.css.reduce((accu, cv) => {
-			return accu || cv.dom.hasAttribute('scoped');
-		}, false);
-		console.log("scoped:", scoped);
 
-		// generate scopeId
-		var scopeId = '';
-		if (scoped) {
-			scopeId = genScopeId();
-			console.log("scopeId:", scopeId);
-		}
-
-		/*
-		 * Process CSS
-		 */
-		// TODO: Allow mixing scoped/non-scoped styles
-		// TODO: Below only works for newest chrome.
-		//       Use <style> injection for cross-browser compatibility
-		parsed.css.forEach((el, i) => {
-			let src = el.txt;
-			let sheet = new CSSStyleSheet(); // TODO: only works in chrome
-			sheet.replaceSync(src); // TODO: only works in chrome
-
-			if (scoped) {
-				// add scopeId to each css
-				keys = Object.keys(sheet.rules);
-				keys.forEach((key, j) => {
-					sheet.rules[key].selectorText += `[${scopeId}]`;
-				});
-			}
-
-			document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet]; // TODO: only works in chrome
-			console.log("style appended:", sheet);
-
-			// import external file via 'src' attribute
-			if (el.dom.hasAttribute('src')) {
-				var l = document.createElement("link");
-				l.href = el.dom.getAttribute('src');
-				l.type = "text/css";
-				l.rel = "stylesheet";
-				document.head.appendChild(l);
-				// TODO: ajax load and add scope to css file
+/**
+ * Finds all Vue's SFCs in html
+ * @param {function(dom, url, name)} callback
+ */
+var mute_names = []; // mute if these names ever appear in Vue's warnings
+function findSFC(callback) {
+	var components = document.querySelectorAll("script");
+	if (components.length > 0) {
+		components.forEach((dom, i) => {
+			if (dom.type == 'vue') {
+				let url = dom.src;
+				let name = getSFCName(dom.getAttribute('name'));
+				if (!name) {
+					name = getSFCName(url);
+					if (!name) {
+						console.error('Unable to parse SFC name for', dom);
+						return;
+					}
+				}
+				mute_names.push(name);
+				callback(dom, url, name);
 			}
 		});
+	}
+}
 
+/**
+ * download .vue file from given url
+ * Async version of getContent()
+ * @return sfc_src
+ */
+function downloadSFC(sfc_url) {
+	console.log(`download: ${sfc_url}`);
+	return new Promise(resolve => {
+		getContent(sfc_url, (sfc_src) => {
+			resolve(sfc_src);
+		});
+	});
+}
 
-		/*
-		 * Process HTML
-		 */
-		var template = parsed.html.reduce((accu, cv) => {
-			return accu + cv.txt;
-		}, ''); // combine all templates
-		// TODO: import external template file via 'src' attribute
+/**
+ * Split SFC content by tags into 3 sections(CSS/JS/HTML).
+ * @param {string} content
+ * @return {css {dom, txt, src}, js {dom, txt, src}, html {dom, txt, src}}
+ */
+async function parseSFC(sfc_src) {
+	var doc = new DOMParser().parseFromString(sfc_src, 'text/html');
+	var ret = {
+		css: assemble(doc.querySelectorAll("style")),
+		js: assemble(doc.querySelectorAll("script")),
+		html: assemble(doc.querySelectorAll("template"))
+	};
+	return ret;
 
+	// extra src text from each tag
+	function assemble(doms) {
+		return Array.from(doms).map((dom, j) => {
+			return {
+				dom: dom,
+				txt: dom.innerHTML,
+				src: dom.outerHTML
+			};
+		});
+	}
+}
 
-		/*
-		 * Process JavaScript
-		 */
-		var js_src = parsed.js.reduce((accu, cv) => {
-			return accu + cv.txt;
-		}, '');
-		// TODO: recursively process vue import statement in script tag
-		// TODO: custom component name
-		var sfc_var = `sfc_${genScopeId().substr(7)}`;
+/**
+ * Generate & apply @.scopeId for all 'scoped' style tags.
+ * Combine all style tags into @.cssText
+ * @param { dom, src, txt } css
+ * @return input CSS object
+ */
+async function preprocessCSS(css) {
+	var _scopeId = null;
+	var _cssText = "";
 
-		// globally register vue component
-		// TODO: Apply closure to self-executing code
-		js_src = js_src.replace(/export\W+default/gi, `var ${sfc_var}=`);
-		js_src += `${sfc_var}.template = \`${template}\`;`;
-		js_src += `Vue.component('${sfc_name}', ${sfc_var});`;
-		js_src += `scanRoot((vue) => vue.$forceUpdate());`; // re-render root
+	// TODO: Allow mixing scoped/non-scoped styles
+	// TODO: Below only works for newest chrome.
+	//       Use <style> injection for cross-browser compatibility
+	css.forEach((el, i) => {
 
+		// generate scopeId
+		if (!_scopeId && el.dom.hasAttribute('scoped')) {
+			_scopeId = genScopeId();
+			console.log("scopeId:", _scopeId); // DEBUG
+		}
+
+		let src = el.txt;
+		let sheet = new CSSStyleSheet(); // TODO: only works in chrome
+		sheet.replaceSync(src); // TODO: only works in chrome
+
+		if (_scopeId) {
+			// add scopeId to each css
+			keys = Object.keys(sheet.rules);
+			keys.forEach((key, j) => {
+				sheet.rules[key].selectorText += `[${_scopeId}]`;
+			});
+		}
+
+		document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet]; // TODO: only works in chrome
+		console.log("style appended:", sheet); // DEBUG
+
+		// import external file via 'src' attribute
+		if (el.dom.hasAttribute('src')) {
+			var l = document.createElement("link");
+			l.href = el.dom.getAttribute('src');
+			l.type = "text/css";
+			l.rel = "stylesheet";
+			document.head.appendChild(l);
+			// TODO: ajax load and add scope to css file
+		}
+	});
+
+	css.scopeId = _scopeId;
+	css.cssText = _cssText;
+	return css;
+}
+
+/**
+ * Combine all template tags into @.templateText
+ * @param { dom, src, txt } html
+ * @return input HTML object
+ */
+async function preprocessHTML(html) {
+	var _templateText = html.reduce((accu, cv) => {
+		return accu + cv.txt;
+	}, '');  // combine all templates
+	// TODO: import external template file via 'src' attribute
+
+	html.templateText = _templateText.trim();
+	return html;
+}
+
+/**
+ * Combine all script tags into @.jsText
+ * @param { dom, src, txt } js
+ * @return input JS object
+ */
+async function preprocessJS(js) {
+	var _jsText = js.reduce((accu, cv) => {
+		return accu + cv.txt;
+	}, '');
+	// TODO: import external js file via 'src' attribute
+
+	const re = /import .+ from "(.*\.vue)"/g
+
+	// first generate a dict for url transforms
+	let matches = Array.from(_jsText.matchAll(re))
+	let url_dict = {}; // {path: blob-url}
+	await Promise.all(matches.map(async ([txt, path], i) => {
+		let child_sfc_url = resolveUrl(path);
+		console.log(`found child: ${child_sfc_url}`);
+		// TODO: check cache for blob url
+		let child_sfc_src = await downloadSFC(child_sfc_url);
+		let [child_sfc_code, child_sfc_obj] = await transpileSFC(child_sfc_src);
+		let [child_sfc_blob_url, child_sfc_blob] = await uploadSFC(child_sfc_code);
+		url_dict[path] = child_sfc_blob_url;
+
+		if (!js.children) { js.children = []; } // DEBUG
+		child_sfc_obj.sfc_blob = child_sfc_blob; // DEBUG
+		child_sfc_obj.sfc_blob_url = child_sfc_blob_url; // DEBUG
+		js.children.push(child_sfc_obj); // DEBUG: record assembled child SFC object
+	}));
+
+	// replace source code using the dict
+	_jsText.replace(re, (txt, path, pos) => {
+		new_txt = txt.replace(path, url_dict[path])
+		console.log(`${txt} ====> ${new_txt}`)
+		return new_txt;
+	});
+
+	js.jsText = _jsText;
+	return js;
+}
+
+/**
+ * Turn js module code into a blob and return the blob's url
+ * @return [string, blob]
+ */
+async function uploadSFC(sfc_code) {
+	blob = new Blob([sfc_code], {type : 'text/javascript'});
+	blob_url = URL.createObjectURL(blob);
+	return [blob_url, blob];
+}
+
+/**
+ * Turn SFC source code into js module code
+ * @param {string} sfc_src
+ * @return {string, object}
+ */
+async function transpileSFC(sfc_src) {
+	console.log('transpile:', sfc_src);
+	let sfc_obj = await parseSFC(sfc_src);
+	await preprocessCSS(sfc_obj.css);
+	await preprocessHTML(sfc_obj.html);
+	await preprocessJS(sfc_obj.js);
+
+	// add .template to module export
+	let sfc_code = sfc_obj.js.jsText;
+	let sfc_var = `sfc_${genScopeId().substr(7)}`;
+	sfc_code = sfc_code.replace(/export\W+default/i, `let ${sfc_var}=`);
+	sfc_code += `${sfc_var}.template = \`${sfc_obj.html.templateText}\`;\n`;
+	sfc_code += `${sfc_var}._scopeId = \`${sfc_obj.css.scopeId}\`;\n`;
+	sfc_code += `export default ${sfc_var};\n`;
+
+	return [sfc_code, sfc_obj];
+}
+
+/**
+ * Init 
+ */
+var SFC = []; // DEBUG
+function init() {
+
+	/* Hook Vue's warnhandler */
+	const _warnHandler = Vue.config.warnHandler;
+	const hasConsole = typeof console !== 'undefined';
+	Vue.config.warnHandler = function(msg, vm, trace) {
+		let mute = false;
+		if (msg.indexOf('Unknown custom element:') == 0) {
+			for (var i=0; i<mute_names.length; i++) {
+				if (msg.indexOf(`<${mute_names[i]}>`) == 24) {
+					mute = true;
+					break;
+				}
+			}
+		}
+
+		if (!mute) {
+			if (_warnHandler) {
+				Vue.config.warnHandler.call(null, msg, vm, trace);
+			} else if (hasConsole && (!Vue.config.silent)) {
+				console.error(("[Vue warn]: " + msg + trace));
+			}
+		}
+	}
+
+	/* Scan script tag for Vue's SFC */
+	findSFC(async (sfc_dom, sfc_url, sfc_name) => {
+		var sfc_src = await downloadSFC(sfc_url);
+		var [sfc_code, sfc_obj] = await transpileSFC(sfc_src);
+		var [sfc_blob_url, sfc_blob] = await uploadSFC(sfc_code);
+
+		// assemble and apply self-executable js for root-level SFC
+		js_src = `
+			import ${sfc_name} from "${sfc_blob_url}";
+			Vue.component('${sfc_name}', ${sfc_name});
+			scanRoot((vue) => vue.$forceUpdate());
+		`;
 		var script = document.createElement('script');
 		script.type = 'module';
 		script.innerHTML = js_src;
 		document.body.appendChild(script);
-		// TODO: import external template file via 'src' attribute
 
-
-		/*
-		 * Finally
-		 */
 		sfc_dom.remove();
-	});
-});
 
+		sfc_obj.sfc_blob = sfc_blob; // DEBUG
+		sfc_obj.sfc_blob_url = sfc_blob_url; // DEBUG
+		SFC.push(sfc_obj); // DEBUG
+	});
+}
+
+
+//
+// main
+//
+init();
