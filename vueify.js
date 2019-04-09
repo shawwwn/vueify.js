@@ -267,14 +267,8 @@ async function preprocessCSS(css) {
 
 	}));
 
-	// inject cssText
-	// TODO: inject cssText in final export script
-	var _cssDom = document.createElement('style');
-	_cssDom.innerHTML = _cssText;
-	document.body.appendChild(_cssDom);
-
 	tmp_iframe.remove();
-	css.cssDom = _cssDom;
+	// css.cssDom = _cssDom;
 	css.scopeId = _scopeId;
 	css.cssText = _cssText;
 	return css;
@@ -362,20 +356,52 @@ async function transpileSFC(sfc_src) {
 	let sfc_code = sfc_obj.js.jsText;
 	let sfc_var = `sfc_${genScopeId().substr(7)}`;
 	sfc_code = sfc_code.replace(/export\W+default/i, `let ${sfc_var}=`);
-	sfc_code += `${sfc_var}.template = \`${sfc_obj.html.templateText}\`;\n`;
-	sfc_code += `${sfc_var}._scopeId = \`${sfc_obj.css.scopeId}\`;\n`;
+
+	if (sfc_obj.css.scopeId) {
+		sfc_code += `${sfc_var}._scopeId = \`${sfc_obj.css.scopeId}\`;\n`;
+	}
+
+	sfc_code += [
+		`${sfc_var}.template = \`${sfc_obj.html.templateText}\`;`,
+
+		// inject css tag
+		`let dom = document.createElement('style');`,
+		`dom.innerHTML = \`${sfc_obj.css.cssText}\`;`,
+		`document.body.appendChild(dom);`,
+
+		// bind css dom to Vue instance
+		`let _beforeCreate = ${sfc_var}.beforeCreate;`,
+		`${sfc_var}.beforeCreate = function() {`,
+		`	this.$cssDom = dom;`,
+		`	if (_beforeCreate) { _beforeCreate(); }`,
+		`}`,
+
+		// remove css dom when Vue instance is destroyed
+		`let _destroyed = ${sfc_var}.destroyed;`,
+		`${sfc_var}.destroyed = function() {`,
+		`	this.$cssDom = dom;`,
+		`	if (this.$cssDom) {`,
+		`		this.$cssDom.remove();`,
+		`		delete this.$cssDom;`,
+		`	}`,
+		`	if (_destroyed) { _destroyed(); }`,
+		`};`,
+	].join('\n');
+
 	sfc_code += `export default ${sfc_var};\n`;
 
 	return [sfc_code, sfc_obj];
 }
 
-/**
- * Init 
- */
+// TODO: enclose whole script, only export 'Vueify'.
 var Vueify = {
 	pendingSFCs: {}, // record unfinished downloads
 	rootSFCs: [],
 };
+
+/**
+ * Init 
+ */
 function init() {
 
 	if (!Vue) {
@@ -432,7 +458,6 @@ function init() {
 
 		// finish registering async component
 		var module = await import(sfc_blob_url);
-		console.log(module);
 		Vueify.pendingSFCs[sfc_name].resolve(module.default);
 
 		// clean up
