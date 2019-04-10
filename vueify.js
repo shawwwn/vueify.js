@@ -180,7 +180,7 @@ function findSFC(callback) {
 				if (!name) {
 					name = getSFCName(url);
 					if (!name) {
-						console.error('[Vueify]: Unable to parse SFC name from given dom.', dom);
+						console.error('[VueifyJS]: Unable to parse SFC name from given dom.', dom);
 						return;
 					}
 				}
@@ -548,9 +548,9 @@ function registerRootSFCs() {
 			pendingSFCs[sfc_name].resolve(module.default);
 			delete pendingSFCs[sfc_name];
 		} else {
-			console.error('[VueifyJS]: Unable to register components in Vue.' + 
-				'\nPlease make sure that Vueify is loaded before creating ' +
-				'the first Vue instance.' , sfc_obj);
+			console.error('[VueifyJS]: Unable to register components in Vue.' +
+				'\n\nPlease make sure the tag name is the html and Vueify is ' +
+				'loaded before creating the first Vue instance.' , sfc_obj);
 		}
 
 		sfc_dom.remove();
