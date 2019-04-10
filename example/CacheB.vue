@@ -1,10 +1,4 @@
 // CacheB.vue
-<style scoped>
-</style>
-
-<template>
-</template>
-
 <script>
 export default {
   data () {

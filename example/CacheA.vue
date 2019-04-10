@@ -1,7 +1,4 @@
 // CacheA.vue
-<style scoped>
-</style>
-
 <template>
   <h1>{{msg}}</h1>
 </template>

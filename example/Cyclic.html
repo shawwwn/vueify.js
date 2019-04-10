@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset='utf-8'>
+		<meta n:00ame="viewport" content="width=device-width, initial-scale=1.0">
+		<meta http-equiv="X-UA-Compatible" content="ie=edge">
+		<title>VueifyJS: Cyclic Dependency Detection</title>
+	</head>
+
+	<body>
+		<p><i>Detect Cyclic Dependency</i></p>
+		<p><i>Stop transpiling if encounter import patterns like:</i></p>
+		<br>
+		<ul>
+			<li>A.vue ==import==> A.vue</li>
+			<li>A.vue ==import==> B.vue ==import==> C.vue ==import==> B.vue</li>
+		</ul>
+		<br>
+		<p>Open console, you should see a <u>cyclic dependency error</u> being thrown.</p>
+		<div id="components-demo">
+			<Cyclic></Cyclic>
+		</div>
+	</body>
+
+	<script src="https://vuejs.org/js/vue.js"></script>
+	<script src="Cyclic.vue" type='vue'></script>
+	<script src="vueify.js"></script>
+	<script type="text/javascript">
+		var app = new Vue({ 
+			el: '#components-demo'
+		});
+	</script>
+</html>
+
