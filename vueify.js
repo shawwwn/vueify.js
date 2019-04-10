@@ -293,8 +293,7 @@ async function preprocessCSS(sfc_obj) {
 
 	}));
 
-	tmp_iframe.remove();
-	// css.cssDom = _cssDom;
+	if (tmp_iframe) { tmp_iframe.remove(); }
 	css.scopeId = _scopeId;
 	css.cssText = _cssText;
 	return css;
@@ -437,36 +436,38 @@ async function transpileSFC(sfc_src, deps=[]) {
 	let sfc_code = sfc_obj.js.jsText;
 	sfc_code = sfc_code.replace(/export\W+default/i, `let opts=`);
 
+	sfc_code += `opts.template = \`${sfc_obj.html.templateText}\`;\n`;
+
 	if (sfc_obj.css.scopeId) {
 		sfc_code += `opts._scopeId = \`${sfc_obj.css.scopeId}\`;\n`;
 	}
 
-	sfc_code += [
-		`opts.template = \`${sfc_obj.html.templateText}\`;`,
+	if (sfc_obj.css.cssText.trim() !== '') {
+		sfc_code += [
+			// inject css tag
+			`let dom = document.createElement('style');`,
+			`dom.innerHTML = \`${sfc_obj.css.cssText}\`;`,
+			`document.body.appendChild(dom);`,
 
-		// inject css tag
-		`let dom = document.createElement('style');`,
-		`dom.innerHTML = \`${sfc_obj.css.cssText}\`;`,
-		`document.body.appendChild(dom);`,
+			// bind css dom to Vue instance
+			`let _beforeCreate = opts.beforeCreate;`,
+			`opts.beforeCreate = function() {`,
+			`	this.$cssDom = dom;`,
+			`	if (_beforeCreate) { _beforeCreate(); }`,
+			`}`,
 
-		// bind css dom to Vue instance
-		`let _beforeCreate = opts.beforeCreate;`,
-		`opts.beforeCreate = function() {`,
-		`	this.$cssDom = dom;`,
-		`	if (_beforeCreate) { _beforeCreate(); }`,
-		`}`,
-
-		// remove css dom when Vue instance is destroyed
-		`let _destroyed = opts.destroyed;`,
-		`opts.destroyed = function() {`,
-		`	this.$cssDom = dom;`,
-		`	if (this.$cssDom) {`,
-		`		this.$cssDom.remove();`,
-		`		delete this.$cssDom;`,
-		`	}`,
-		`	if (_destroyed) { _destroyed(); }`,
-		`};`,
-	].join('\n');
+			// remove css dom when Vue instance is destroyed
+			`let _destroyed = opts.destroyed;`,
+			`opts.destroyed = function() {`,
+			`	this.$cssDom = dom;`,
+			`	if (this.$cssDom) {`,
+			`		this.$cssDom.remove();`,
+			`		delete this.$cssDom;`,
+			`	}`,
+			`	if (_destroyed) { _destroyed(); }`,
+			`};`,
+		].join('\n');
+	}
 
 	sfc_code += `export default opts;\n`;
 
