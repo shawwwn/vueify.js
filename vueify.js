@@ -8,6 +8,19 @@
  * @author Shawwwn <shawwwn1@gmail.com>
  */
 
+//
+// module name - start
+//
+var Vueify = (function() {
+//
+// module name - end
+//
+
+
+//
+// utils
+//
+
 /**
  * Load contents of a remote file
  * @param {string} url
@@ -26,17 +39,16 @@ function getContent(url, callback) {
 	xhr.send();
 }
 
-//
-// utils
-//
-
 /**
  * Resolve relative path into url
  * @param {string} url
  * @param {function(string)} callback
  */
 function resolveUrl(path) {
-	var url = path;
+	let a = document.createElement('a');
+	a.href = path;
+	let url = a.href;
+	delete a;
 	return url;
 }
 
@@ -64,15 +76,26 @@ function getSFCName(url) {
 	return null;
 };
 
+var scopeId_cache = {};
+
 /**
  * Generate a random scope id
  * @return {string}
  */
 function genScopeId() {
-	var p1 = ((new Date).getTime() % 65535).toString(16).padStart(4, '0');
-	var p2 = Math.ceil(Math.random() * 65535).toString(16).padStart(4, '0');
-	// TODO: record generated scopeIds so they don't collide
-	return `data-v-${p1}${p2}`;
+	const genId = () => {
+		let p1 = ((new Date).getTime() % 65535).toString(16).padStart(4, '0');
+		let p2 = Math.ceil(Math.random() * 65535).toString(16).padStart(4, '0');
+		return `data-v-${p1}${p2}`;
+	}
+
+	let id = genId();
+	while (scopeId_cache[id]) {
+		id = genId();
+	}
+
+	scopeId_cache[id] = true;
+	return id;
 }
 
 /**
@@ -82,7 +105,7 @@ function genScopeId() {
  * @return {[...vue_instance]}
  */
 function scanRoot(callback) {
-	rootInstances = [];
+	let rootVueInstances = [];
 	let inFragment = false;
 	let currentFragment = null;
 
@@ -101,7 +124,7 @@ function scanRoot(callback) {
 		if (instance) {
 
 			// skip if root already recorded
-			if (rootInstances.indexOf(instance.$root) === -1) {
+			if (rootVueInstances.indexOf(instance.$root) === -1) {
 				instance = instance.$root;
 			} else {
 				return true;
@@ -113,13 +136,13 @@ function scanRoot(callback) {
 				currentFragment = instance;
 			}
 
-			rootInstances.push(instance);
+			rootVueInstances.push(instance);
 			callback(instance);
 			return true;
 		}
 	});
 
-	return rootInstances;
+	return rootVueInstances;
 
 	/**
 	 * DOM walk helper
@@ -141,11 +164,12 @@ function scanRoot(callback) {
 // member
 //
 
+var muteNames = []; // mute if these names ever appear in Vue's warnings
+
 /**
- * Finds all Vue's SFCs in html
+ * Finds all Vue SFCs in script tag of current document
  * @param {function(dom, url, name)} callback
  */
-var mute_names = []; // mute if these names ever appear in Vue's warnings
 function findSFC(callback) {
 	var components = document.querySelectorAll("script");
 	if (components.length > 0) {
@@ -156,11 +180,11 @@ function findSFC(callback) {
 				if (!name) {
 					name = getSFCName(url);
 					if (!name) {
-						console.error('Unable to parse SFC name for', dom);
+						console.error('[Vueify]: Unable to parse SFC name from given dom.', dom);
 						return;
 					}
 				}
-				mute_names.push(name);
+				muteNames.push(name);
 				callback(dom, url, name);
 			}
 		});
@@ -288,6 +312,8 @@ async function preprocessHTML(html) {
 	return html;
 }
 
+var cachedSFCs = {}; // { url : {blob_url, sfc_obj} }
+
 /**
  * Combine all script tags into @.jsText
  * @param { dom, src, txt } js
@@ -308,34 +334,55 @@ async function preprocessJS(js) {
 	_jsText += '\n' + el.txt;
 
 	const re = /import .+ from ['"`](.*\.vue)["'`]/g
-
-	// first generate a dict for url transforms
 	let matches = Array.from(_jsText.matchAll(re))
-	let url_dict = {}; // {path: blob-url}
 	await Promise.all(matches.map(async ([txt, path], i) => {
 		let child_sfc_url = resolveUrl(path);
 		console.log(`found child: ${child_sfc_url}`);
-		// TODO: check cache for blob url
-		let child_sfc_src = await downloadSFC(child_sfc_url);
-		let [child_sfc_code, child_sfc_obj] = await transpileSFC(child_sfc_src);
-		let [child_sfc_blob_url, child_sfc_blob] = await uploadSFC(child_sfc_code);
-		url_dict[path] = child_sfc_blob_url;
 
-		if (!js.children) { js.children = []; } // DEBUG
-		child_sfc_obj.sfc_blob = child_sfc_blob; // DEBUG
-		child_sfc_obj.sfc_blob_url = child_sfc_blob_url; // DEBUG
-		js.children.push(child_sfc_obj); // DEBUG: record assembled child SFC object
+		if (!cachedSFCs.hasOwnProperty(child_sfc_url)) {
+			let resolve;
+			cachedSFCs[child_sfc_url] = new Promise((res) => { resolve = res });
+
+			let child_sfc_src = await downloadSFC(child_sfc_url);
+			let [child_sfc_code, child_sfc_obj] = await transpileSFC(child_sfc_src);
+			let [child_sfc_blob_url, child_sfc_blob] = await uploadSFC(child_sfc_code);
+			child_sfc_obj.sfc_blob = child_sfc_blob;
+			child_sfc_obj.sfc_blob_url = child_sfc_blob_url;
+			cachedSFCs[child_sfc_url] = {
+				blob_url: child_sfc_blob_url,
+				sfc_obj: child_sfc_obj,
+			};
+
+			resolve(cachedSFCs[child_sfc_url]);
+		} else {
+			console.log(`cached: ${child_sfc_url}`);
+		}
 	}));
 
-	// replace source code using the dict
-	_jsText = _jsText.replace(re, (txt, path, pos) => {
-		new_txt = txt.replace(path, url_dict[path])
-		console.log(`${txt} ====> ${new_txt}`) // DEBUG
+	// replace .vue path with blob url
+	_jsText = await replace_async(_jsText, re, async (txt, path, pos) => {
+		let url = resolveUrl(path);
+		// TODO: Do not allow import self / cyclic deps.
+		let cache = await Promise.resolve(cachedSFCs[url]);
+		new_txt = txt.replace(path, cache.blob_url);
+		console.log(`${txt} ====> ${new_txt}`); // DEBUG
 		return new_txt;
 	});
 
 	js.jsText = _jsText;
 	return js;
+
+	// Async string replace
+	// TODO: rewrite for a more efficient version
+	async function replace_async(str, re, cb_async) {
+		let ps = [];
+		str.replace(re, (match, ...args) => {
+			let p = cb_async(match, ...args);
+			ps.push(p);
+		});
+		let data = await Promise.all(ps);
+		return str.replace(re, () => data.shift());
+	}
 }
 
 /**
@@ -400,19 +447,93 @@ async function transpileSFC(sfc_src) {
 	return [sfc_code, sfc_obj];
 }
 
-// TODO: enclose whole script, only export 'Vueify'.
-var Vueify = {
-	pendingSFCs: {}, // record unfinished downloads
-	rootSFCs: [],
-};
+var pendingSFCs = {}; // record unfinished downloads
+var rootSFCs = [];
 
 /**
- * Init 
+ * Find & transpile all .vue files from script tags,
+ * then register them as global Vue components.
+ * 
+ * Must be called right after Vue.js is loaded, because Vue stops registering
+ * components if left running for a short while. (reason is unknown)
+ */
+function registerRootSFCs() {
+
+	/* Scan script tag for Vue's SFC */
+	findSFC(async (sfc_dom, sfc_url, sfc_name) => {
+
+		// TODO: Vue.component() registeration no longer has effect when Vue 
+		//       finishs scanning the entire document(warnings are thrown for 
+		//       unknown elements). Thus, global components will not load 
+		//       sometimes.
+		//       Current solution is to use promise to hold the place for named
+		//       components until this module later return with data.
+		//       A more robust way of guaranteed loading components is to hook 
+		//       Vue's constructor, init vue instance only after finishing 
+		//       component registerations.
+
+		sfc_url = resolveUrl(sfc_url);
+		console.log(`found: ${sfc_url}`);
+
+		// check cache
+		if (cachedSFCs.hasOwnProperty(sfc_url)) {
+			console.log(`cached: ${sfc_url}`);
+			return;
+		}
+
+		// register async component immediately
+		if (!pendingSFCs[sfc_name]) {
+			Vue.component(sfc_name, (resolve, reject) => {
+				const wrapper = (func) => {
+					return (data) => {
+						func(data);
+						scanRoot((vue) => vue.$forceUpdate());
+					};
+				};
+				pendingSFCs[sfc_name] = {
+					resolve: wrapper(resolve),
+					reject: wrapper(reject)
+				};
+			});
+		}
+
+		// transpile
+		let resolve;
+		cachedSFCs[sfc_url] = new Promise((res) => { resolve = res });
+		let sfc_src = await downloadSFC(sfc_url);
+		let [sfc_code, sfc_obj] = await transpileSFC(sfc_src);
+		let [sfc_blob_url, sfc_blob] = await uploadSFC(sfc_code);
+		sfc_obj.sfc_blob = sfc_blob;
+		sfc_obj.sfc_blob_url = sfc_blob_url;
+		cachedSFCs[sfc_url] = {
+			blob_url: sfc_blob_url,
+			sfc_obj: sfc_obj,
+		};
+		resolve(cachedSFCs[sfc_url]);
+		rootSFCs.push(sfc_obj);
+
+		// finish registering async component
+		var module = await import(sfc_blob_url);
+		if (pendingSFCs.hasOwnProperty(sfc_name)) {
+			pendingSFCs[sfc_name].resolve(module.default);
+			delete pendingSFCs[sfc_name];
+		} else {
+			console.error('[VueifyJS]: Unable to register components in Vue.' + 
+				'\nPlease make sure that Vueify is loaded before creating ' +
+				'the first Vue instance.' , sfc_obj);
+		}
+
+		sfc_dom.remove();
+	});
+}
+
+/**
+ * Module Initialization
  */
 function init() {
 
 	if (!Vue) {
-		console.error('VueifyJS: Need Vue to run.');
+		console.error('[Vueify]: Need Vue to run.');
 		return;
 	}
 
@@ -422,8 +543,8 @@ function init() {
 	Vue.config.warnHandler = function(msg, vm, trace) {
 		let mute = false;
 		if (msg.indexOf('Unknown custom element:') == 0) {
-			for (var i=0; i<mute_names.length; i++) {
-				if (msg.indexOf(`<${mute_names[i]}>`) == 24) {
+			for (var i=0; i<muteNames.length; i++) {
+				if (msg.indexOf(`<${muteNames[i]}>`) == 24) {
 					mute = true;
 					break;
 				}
@@ -439,46 +560,38 @@ function init() {
 		}
 	}
 
-	/* Scan script tag for Vue's SFC */
-	findSFC(async (sfc_dom, sfc_url, sfc_name) => {
-
-		// register async component immediately
-		if (!Vueify.pendingSFCs[sfc_name]) {
-			Vue.component(sfc_name, (resolve, reject) => {
-				const wrapper = (func) => {
-					return (data) => {
-						func(data);
-						scanRoot((vue) => vue.$forceUpdate());
-					};
-				};
-				Vueify.pendingSFCs[sfc_name] = {
-					resolve: wrapper(resolve),
-					reject: wrapper(reject)
-				};
-			});
-		}
-
-		// wait for SFCs to load
-		var sfc_src = await downloadSFC(sfc_url);
-		var [sfc_code, sfc_obj] = await transpileSFC(sfc_src);
-		var [sfc_blob_url, sfc_blob] = await uploadSFC(sfc_code);
-
-		// finish registering async component
-		var module = await import(sfc_blob_url);
-		Vueify.pendingSFCs[sfc_name].resolve(module.default);
-
-		// clean up
-		delete Vueify.pendingSFCs[sfc_name];
-		sfc_dom.remove();
-
-		sfc_obj.sfc_blob = sfc_blob; // DEBUG
-		sfc_obj.sfc_blob_url = sfc_blob_url; // DEBUG
-		Vueify.rootSFCs.push(sfc_obj); // DEBUG
-	});
+	registerRootSFCs();
 }
-
 
 //
 // main
 //
 init();
+
+//
+// module export - start
+//
+return {
+	// optional exports
+	findSFC,
+	downloadSFC,
+	parseSFC,
+	preprocessCSS,
+	preprocessHTML,
+	preprocessJS,
+	uploadSFC,
+	init,
+
+	// core exports
+	registerRootSFCs,
+	transpileSFC,
+	rootSFCs,
+	cachedSFCs,
+	muteNames,
+};
+}());
+//
+// module export - end
+//
+
+
