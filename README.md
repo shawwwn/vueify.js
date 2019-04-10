@@ -13,15 +13,16 @@ For developers who want to take advantage of the **.vue** file but would prefer 
 
 
 ## Usage:
-First include script tag for .vue files, then include vueify.js
-Set `type='vue'` on script tags for .vue files, because browser won't load scripts with unknown type by default.
+First include script tags linked to .vue files, then include vueify.js
+
+Set `type='vue'` for our script tags, because browser won't automatically load content in script tags with unknown type.
  
 ```html
 <script src="Hello.vue" type='vue'></script>
 <script src="vueify.js"></script>
 ```
 
-Vue' SFC loaded this way will be registered globally under the its SFC file name or the name user specified in script tag.
+SFC loaded this way will be registered globally under the its SFC file name or the name user specified in script tag.
   
 ```html
 <script src="Hello.vue" type='vue' name='custom-name'></script>
@@ -29,7 +30,11 @@ Vue' SFC loaded this way will be registered globally under the its SFC file name
 
 
 ## How It Works:
-`vueify.js` first scans all script tags with `type=vue`, then loads .vue files from remote server and compiles their contents into corresponding css/js to be dynamically injected to web page. 
+`vueify.js` will first scan document for script tags with `type=vue`, gather url for .vue files.
+
+It then downloads and transpiles these .vue files and their dependent .vue files(from `import`) into ES6-compatible javascript.
+
+We refer to .vue files inside script tags as root-level therefore they will be automatically loaded as global Vue components by `vueify.js`. Users are responsible for registering any children Vue component inside these .vue files.
 
 
 ## Example:
@@ -83,5 +88,6 @@ Then write your html like this:
 * Please verify that `vueify.js` loads after `vue.js` and `*.vue`.
 * No custom lang support ~~lang="coffee"~~ in .vue.
 * Use ES6's `import/export` for nested components, CommonJS's `require/module.exports` is not currently supported.
+* Cyclic dependency in .vue file will cause transpile error.
 * Refer TODOs in source code for future improvements.
-* Contributions are welcome! Just submit a PR ;)
+* Contributions are always welcome! Just submit a PR ;)
