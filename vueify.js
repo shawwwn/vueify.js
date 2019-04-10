@@ -234,10 +234,12 @@ async function parseSFC(sfc_src) {
 /**
  * Generate & apply @.scopeId for all 'scoped' style tags.
  * Combine all style tags into @.cssText
- * @param { dom, src, txt } css
+ * @param {js, css{ dom, src, txt }, html} sfc_obj
  * @return input CSS object
  */
-async function preprocessCSS(css) {
+async function preprocessCSS(sfc_obj) {
+	var css = sfc_obj.css;
+
 	var _scopeId = null;
 	var _cssText = "";
 	var tmp_iframe = null; // to temporarily hold and parse css text
@@ -300,10 +302,12 @@ async function preprocessCSS(css) {
 
 /**
  * Combine all template tags into @.templateText
- * @param { dom, src, txt } html
+ * @param {js, css, html{ dom, src, txt }} sfc_obj
  * @return input HTML object
  */
-async function preprocessHTML(html) {
+async function preprocessHTML(sfc_obj) {
+	var html = sfc_obj.html;
+
 	var _templateText = html.reduce((accu, cv) => {
 		return accu + cv.txt;
 	}, '');  // combine all templates
@@ -316,11 +320,12 @@ var cachedSFCs = {}; // { url : {blob_url, sfc_obj} }
 
 /**
  * Combine all script tags into @.jsText
- * @param { dom, src, txt } js
+ * @param {js{ dom, src, txt }, css, html} sfc_obj
  * @return input JS object
  */
-async function preprocessJS(js) {
-	
+async function preprocessJS(sfc_obj) {
+	var js = sfc_obj.js;
+
 	// get content from last script tag
 	var el = js[js.length-1];
 	var _jsText = await new Promise((resolve, reject) => {
@@ -403,9 +408,9 @@ async function uploadSFC(sfc_code) {
 async function transpileSFC(sfc_src) {
 	console.log('transpile:', sfc_src);
 	let sfc_obj = await parseSFC(sfc_src);
-	await preprocessCSS(sfc_obj.css);
-	await preprocessHTML(sfc_obj.html);
-	await preprocessJS(sfc_obj.js);
+	await preprocessCSS(sfc_obj);
+	await preprocessHTML(sfc_obj);
+	await preprocessJS(sfc_obj);
 
 	// add .template to module export
 	let sfc_code = sfc_obj.js.jsText;
