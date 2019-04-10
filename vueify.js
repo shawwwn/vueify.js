@@ -294,10 +294,18 @@ async function preprocessHTML(html) {
  * @return input JS object
  */
 async function preprocessJS(js) {
-	var _jsText = js.reduce((accu, cv) => {
-		return accu + cv.txt;
-	}, '');
-	// TODO: import external js file via 'src' attribute
+	
+	// get content from last script tag
+	var el = js[js.length-1];
+	var _jsText = await new Promise((resolve, reject) => {
+		if (el.dom.hasAttribute('src')) {
+			let path = el.dom.getAttribute('src');
+			getContent(resolveUrl(path), (content) => resolve(content));
+		} else {
+			resolve('');
+		}
+	});
+	_jsText += '\n' + el.txt;
 
 	const re = /import .+ from ['"`](.*\.vue)["'`]/g
 
@@ -354,15 +362,14 @@ async function transpileSFC(sfc_src) {
 
 	// add .template to module export
 	let sfc_code = sfc_obj.js.jsText;
-	let sfc_var = `sfc_${genScopeId().substr(7)}`;
-	sfc_code = sfc_code.replace(/export\W+default/i, `let ${sfc_var}=`);
+	sfc_code = sfc_code.replace(/export\W+default/i, `let opts=`);
 
 	if (sfc_obj.css.scopeId) {
-		sfc_code += `${sfc_var}._scopeId = \`${sfc_obj.css.scopeId}\`;\n`;
+		sfc_code += `opts._scopeId = \`${sfc_obj.css.scopeId}\`;\n`;
 	}
 
 	sfc_code += [
-		`${sfc_var}.template = \`${sfc_obj.html.templateText}\`;`,
+		`opts.template = \`${sfc_obj.html.templateText}\`;`,
 
 		// inject css tag
 		`let dom = document.createElement('style');`,
@@ -370,15 +377,15 @@ async function transpileSFC(sfc_src) {
 		`document.body.appendChild(dom);`,
 
 		// bind css dom to Vue instance
-		`let _beforeCreate = ${sfc_var}.beforeCreate;`,
-		`${sfc_var}.beforeCreate = function() {`,
+		`let _beforeCreate = opts.beforeCreate;`,
+		`opts.beforeCreate = function() {`,
 		`	this.$cssDom = dom;`,
 		`	if (_beforeCreate) { _beforeCreate(); }`,
 		`}`,
 
 		// remove css dom when Vue instance is destroyed
-		`let _destroyed = ${sfc_var}.destroyed;`,
-		`${sfc_var}.destroyed = function() {`,
+		`let _destroyed = opts.destroyed;`,
+		`opts.destroyed = function() {`,
 		`	this.$cssDom = dom;`,
 		`	if (this.$cssDom) {`,
 		`		this.$cssDom.remove();`,
@@ -388,7 +395,7 @@ async function transpileSFC(sfc_src) {
 		`};`,
 	].join('\n');
 
-	sfc_code += `export default ${sfc_var};\n`;
+	sfc_code += `export default opts;\n`;
 
 	return [sfc_code, sfc_obj];
 }
