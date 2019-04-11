@@ -26,7 +26,7 @@ Set `type='vue'` for our script tags, because browser won't automatically load c
 <script src="vueify.js"></script>
 ```
 
-SFC loaded this way will be registered globally under the its SFC file name or the name user specified in script tag.
+SFC loaded this way will be registered globally under the its file name (e.g., Hello.vue ==> hello) or the name user specified in script tag.
   
 ```html
 <script src="Hello.vue" type='vue' name='custom-name'></script>
