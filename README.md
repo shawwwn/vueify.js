@@ -1,6 +1,8 @@
 # Vueify.js
+
 Browser loading .vue file from script tag. No muss, no fuss!
 
+<img src="https://user-images.githubusercontent.com/4016736/55936265-a29a3200-5bea-11e9-90a7-46bbd762c0c2.png" width="200" height="230" />
 
 ## Description:
 Vue's [Single-File-Compoment(SFC)](https://vuejs.org/v2/guide/single-file-components.html) is a nice feature allowing modular code and easier code refactorization. However, a SFC **(*.vue)** file needs to be locally compiled into into browser recognizable primitives(js, css, etc.) before shipping to your browser. This process is not at all straight-forward. At the minimium you will need:
