@@ -5,17 +5,19 @@ Browser loading .vue file from script tag. No muss, no fuss!
 <img src="https://user-images.githubusercontent.com/4016736/55936265-a29a3200-5bea-11e9-90a7-46bbd762c0c2.png" width="200" height="230" />
 
 ## Description:
-Vue's [Single-File-Compoment(SFC)](https://vuejs.org/v2/guide/single-file-components.html) is a nice feature allowing modular code and easier code refactorization. However, a SFC **(*.vue)** file needs to be locally compiled into into browser recognizable primitives(js, css, etc.) before shipping to your browser. This process is not at all straight-forward. At the minimium you will need:
-    
-    npm --> browserify --> vueify --> watchify(if you want realtime transpiling) --> bundle.js
+___Tl;dr.___ `Vueify.js` is an attempt to recreate the desired behavior of [Vueify](https://github.com/vuejs/vueify) in browser environment!
 
-With more sophisticated web pre-processing suites(glup, babel, webpack, rollup etc), the initial setup time of your project would easily overwhelm the actual development.
-
-For developers who want to take advantage of the **.vue** file but would prefer the old ways of front-end development, I present you `Vueify.js` -- Works just like [Vueify](https://github.com/vuejs/vueify), but gets everything done in the browser. No more local preprocessors, no more BS!
+> Vue's [Single-File-Compoment(SFC)](https://vuejs.org/v2/guide/single-file-components.html) is a nice feature allowing modular code and easier code refactorization. However, a SFC **(*.vue)** file needs to be locally compiled into into browser recognizable primitives(js, css, etc.) before shipping to your browser. This process is not at all straight-forward. At the minimium you will need:
+>
+>    npm --> browserify --> vueify --> watchify(if you want realtime transpiling) --> bundle.js
+>
+> With more sophisticated web pre-processing suites(glup, babel, webpack, rollup etc), the initial setup time of your project would easily overwhelm the actual development.
+>
+> For developers who want to take advantage of the **.vue** file but would prefer to keep a light stacks, I present you `Vueify.js` -- Works just like [Vueify](https://github.com/vuejs/vueify), except gets everything done in the browser. No more local preprocessors, develop frontend app in a truly frontend environment.
 
 
 ## Usage:
-First include script tags linked to .vue files, then include vueify.js
+**First include script tags linked to .vue files, then include vueify.js**
 
 Set `type='vue'` for our script tags, because browser won't automatically load content in script tags with unknown type.
  
