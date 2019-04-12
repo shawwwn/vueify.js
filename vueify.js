@@ -339,6 +339,8 @@ async function preprocessJS(sfc_obj, deps=[]) {
 	});
 	_jsText += '\n' + el.txt;
 
+	// TODO: interact other preprocessors(like babel, if any).
+
 	// search for 'import *.vue' statements and transpile the .vue file
 	const re = /import .+ from ['"`](.*\.vue)["'`]/g
 	let matches = Array.from(_jsText.matchAll(re))
@@ -509,22 +511,6 @@ function registerRootSFCs() {
 			return;
 		}
 
-		// register async component immediately
-		if (!pendingSFCs[sfc_name]) {
-			Vue.component(sfc_name, (resolve, reject) => {
-				const wrapper = (func) => {
-					return (data) => {
-						func(data);
-						scanRoot((vue) => vue.$forceUpdate());
-					};
-				};
-				pendingSFCs[sfc_name] = {
-					resolve: wrapper(resolve),
-					reject: wrapper(reject)
-				};
-			});
-		}
-
 		// transpile
 		let resolve;
 		cachedSFCs[sfc_url] = new Promise((res) => { resolve = res });
@@ -543,18 +529,13 @@ function registerRootSFCs() {
 		rootSFCs.push(sfc_obj);
 
 		// finish registering async component
-		var module = await import(sfc_blob_url);
-		if (pendingSFCs.hasOwnProperty(sfc_name)) {
-			pendingSFCs[sfc_name].resolve(module.default);
-			delete pendingSFCs[sfc_name];
-		} else {
-			console.error('[VueifyJS]: Unable to register components in Vue.' +
-				'\n\nPlease make sure the tag name is the html and Vueify is ' +
-				'loaded before creating the first Vue instance.' , sfc_obj);
-		}
+		var module = await import(sfc_blob_url); // TODO: use ployfil import() for FireFox
+		Vue.component(sfc_name, module.default);
+		scanRoot((vue) => vue.$forceUpdate()); // TODO: defer update after all SFCs finished loading
 
 		sfc_dom.remove();
 	});
+
 }
 
 /**
