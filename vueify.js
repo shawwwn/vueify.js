@@ -22,6 +22,47 @@ var Vueify = (function() {
 //
 
 /**
+ * Polyfill import() for Firefox support
+ * Modified from:
+ * https://github.com/uupaa/dynamic-import-polyfill/blob/master/importModule.js
+ * @param {string} url
+ */
+function importModule(url) {
+	try {
+		return (new Function(`return import('${url}')`))();
+	} catch (err) {}
+
+	return new Promise((resolve, reject) => {
+		const vector = "$importModule$" + Math.random().toString(32).slice(2);
+		const script = document.createElement("script");
+		const destructor = () => {
+			delete window[vector];
+			script.onerror = null;
+			script.onload = null;
+			script.remove();
+			URL.revokeObjectURL(script.src);
+			script.src = "";
+		};
+		script.defer = "defer";
+		script.type = "module";
+		script.onerror = () => {
+			reject(new Error(`Failed to import: ${url}`));
+			destructor();
+		};
+		script.onload = () => {
+			resolve(window[vector]);
+			destructor();
+		};
+		const absURL = resolveUrl(url);
+		const loader = `import * as m from "${absURL}"; window.${vector} = m;`; // export Module
+		const blob = new Blob([loader], { type: "text/javascript" });
+		script.src = URL.createObjectURL(blob);
+
+		document.head.appendChild(script);
+	});
+}
+
+/**
  * Load contents of a remote file
  * @param {string} url
  * @param {function(string)} callback
@@ -45,11 +86,9 @@ function getContent(url, callback) {
  * @param {function(string)} callback
  */
 function resolveUrl(path) {
-	let a = document.createElement('a');
+	const a = document.createElement('a');
 	a.href = path;
-	let url = a.href;
-	delete a;
-	return url;
+	return a.href;
 }
 
 /**
@@ -498,16 +537,6 @@ async function registerRootSFCs() {
 	/* Scan script tag for Vue's SFC */
 	await findSFC(async (sfc_dom, sfc_url, sfc_name) => {
 
-		// TODO: Vue.component() registeration no longer has effect when Vue 
-		//       finishs scanning the entire document(warnings are thrown for 
-		//       unknown elements). Thus, global components will not load 
-		//       sometimes.
-		//       Current solution is to use promise to hold the place for named
-		//       components until this module later return with data.
-		//       A more robust way of guaranteed loading components is to hook 
-		//       Vue's constructor, init vue instance only after finishing 
-		//       component registerations.
-
 		sfc_url = resolveUrl(sfc_url);
 		console.log(`found: ${sfc_url}`); // DEBUG
 
@@ -536,7 +565,7 @@ async function registerRootSFCs() {
 		rootSFCs.push(sfc_obj);
 
 		// finish registering async component
-		var module = await import(sfc_blob_url); // TODO: use ployfil import() for FireFox
+		var module = await importModule(sfc_blob_url);
 		Vue.component(sfc_name, module.default);
 
 		// workaround for https://github.com/vuejs/vue-devtools/issues/969
