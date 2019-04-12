@@ -169,8 +169,10 @@ var muteNames = []; // mute if these names ever appear in Vue's warnings
 /**
  * Finds all Vue SFCs in script tag of current document
  * @param {function(dom, url, name)} callback
+ * @return Promise
  */
 function findSFC(callback) {
+	var promises = [];
 	var components = document.querySelectorAll("script");
 	if (components.length > 0) {
 		components.forEach((dom, i) => {
@@ -185,10 +187,14 @@ function findSFC(callback) {
 					}
 				}
 				muteNames.push(name);
-				callback(dom, url, name);
+				let ret = callback(dom, url, name);
+				if (ret.__proto__ === Promise.prototype) {
+					promises.push(ret);
+				}
 			}
 		});
 	}
+	return Promise.all(promises);
 }
 
 /**
@@ -487,10 +493,10 @@ var rootSFCs = [];
  * Must be called right after Vue.js is loaded, because Vue stops registering
  * components if left running for a short while. (reason is unknown)
  */
-function registerRootSFCs() {
+async function registerRootSFCs() {
 
 	/* Scan script tag for Vue's SFC */
-	findSFC(async (sfc_dom, sfc_url, sfc_name) => {
+	await findSFC(async (sfc_dom, sfc_url, sfc_name) => {
 
 		// TODO: Vue.component() registeration no longer has effect when Vue 
 		//       finishs scanning the entire document(warnings are thrown for 
@@ -532,11 +538,19 @@ function registerRootSFCs() {
 		// finish registering async component
 		var module = await import(sfc_blob_url); // TODO: use ployfil import() for FireFox
 		Vue.component(sfc_name, module.default);
-		scanRoot((vue) => vue.$forceUpdate()); // TODO: defer update after all SFCs finished loading
+
+		// workaround for https://github.com/vuejs/vue-devtools/issues/969
+		let global_components = Object.getPrototypeOf(Vue.options.components);
+		if (global_components != null) {
+			global_components[sfc_name] = Vue.options.components[sfc_name];
+			delete Vue.options.components[sfc_name];
+		}
 
 		sfc_dom.remove();
 	});
 
+	// update all instances
+	scanRoot((vue) => vue.$forceUpdate());
 }
 
 /**
