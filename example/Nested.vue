@@ -8,7 +8,7 @@
   }
 
   .red {
-    color: #0f0; // this should be overrided by rules in Hello.vue
+    color: green; // this should be overrided by rules in Hello.vue
   }
 </style>
 

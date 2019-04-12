@@ -339,7 +339,7 @@ async function preprocessJS(sfc_obj, deps=[]) {
 	});
 	_jsText += '\n' + el.txt;
 
-	// TODO: interact other preprocessors(like babel, if any).
+	// TODO: interact other preprocessors(e.g., babel, if any).
 
 	// search for 'import *.vue' statements and transpile the .vue file
 	const re = /import .+ from ['"`](.*\.vue)["'`]/g
@@ -446,19 +446,20 @@ async function transpileSFC(sfc_src, deps=[]) {
 
 	if (sfc_obj.css.cssText.trim() !== '') {
 		sfc_code += [
-			// inject css tag
+			// create css dom
 			`let dom = document.createElement('style');`,
 			`dom.innerHTML = \`${sfc_obj.css.cssText}\`;`,
-			`document.body.appendChild(dom);`,
+			`dom.setAttribute('vue-sfc', '');`,
 
-			// bind css dom to Vue instance
+			// inject css dom at beforeCreate()
 			`let _beforeCreate = opts.beforeCreate;`,
 			`opts.beforeCreate = function() {`,
+			`	document.head.appendChild(dom);`,
 			`	this.$cssDom = dom;`,
 			`	if (_beforeCreate) { _beforeCreate(); }`,
 			`}`,
 
-			// remove css dom when Vue instance is destroyed
+			// remove css dom when destroyed()
 			`let _destroyed = opts.destroyed;`,
 			`opts.destroyed = function() {`,
 			`	this.$cssDom = dom;`,

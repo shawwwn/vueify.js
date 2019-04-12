@@ -1,7 +1,7 @@
 // Hello.vue
 <style scoped>
   .red {
-    color: #f00;
+    color: red;
   }
 </style>
 
