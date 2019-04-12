@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset='utf-8'>
+		<meta n:00ame="viewport" content="width=device-width, initial-scale=1.0">
+		<meta http-equiv="X-UA-Compatible" content="ie=edge">
+		<title>VueifyJS: Dynamic Import</title>
+	</head>
+
+	<body>
+		<p><i>Dynamically Import .vue file</i></p>
+		<br>
+		<p>Below should display <u>I am dynamically imported!</u> x2.</p>
+		<div id="components-demo">
+			<d1></d1>
+			<d2></d2>
+		</div>
+	</body>
+
+	<script src="https://vuejs.org/js/vue.js"></script>
+	<script src="vueify.js"></script>
+	<script type="text/javascript">
+		(async function() {
+
+
+			var module_data = await Vueify.importSFC('./Dynamic.vue');
+
+			var app = new Vue({ 
+				el: '#components-demo',
+				components: {
+					d1: module_data, // import called inside async function
+					d2: () => Vueify.importSFC('./Dynamic.vue'), // import called inside normal function
+				},
+			});
+
+
+		})();
+	</script>
+</html>
+
