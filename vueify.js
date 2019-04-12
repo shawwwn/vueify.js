@@ -321,7 +321,7 @@ async function preprocessCSS(sfc_obj) {
 			let s = tmp_iframe.contentDocument.createElement('style');
 			s.innerHTML = el.txt + external_txt;
 			tmp_iframe.contentDocument.head.appendChild(s);
-			let rules = s.sheet.rules;
+			let rules = s.sheet.cssRules;
 			for (let i=0; i<rules.length; i++) {
 
 				// add scopeId to each css
@@ -372,7 +372,7 @@ async function preprocessJS(sfc_obj, deps=[]) {
 	console.log('dependency stack', deps); // DEBUG
 	var js = sfc_obj.js;
 
-	// get content from last script tag
+	// get content only from last script tag
 	var el = js[js.length-1];
 	var _jsText = await new Promise((resolve, reject) => {
 		if (el.dom.hasAttribute('src')) {
@@ -388,8 +388,8 @@ async function preprocessJS(sfc_obj, deps=[]) {
 
 	// search for 'import *.vue' statements and transpile the .vue file
 	const re = /import .+ from ['"`](.*\.vue)["'`]/g
-	let matches = Array.from(_jsText.matchAll(re))
-	await Promise.all(matches.map(async ([txt, path], i) => {
+	_jsText = await asyncStringReplace(_jsText, re, async(match, path, offset, txt) => {
+
 		let child_sfc_url = resolveUrl(path);
 		console.log(`found child: ${child_sfc_url}`); // DEBUG
 
@@ -400,7 +400,7 @@ async function preprocessJS(sfc_obj, deps=[]) {
 			throw '';
 		}
 
-		// check if there is cached sfc obj to be used directly
+		// if no cached sfc obj to be used directly, load sfc from remote
 		if (!cachedSFCs.hasOwnProperty(child_sfc_url)) {
 			let resolve;
 			cachedSFCs[child_sfc_url] = new Promise((res) => { resolve = res });
@@ -409,7 +409,7 @@ async function preprocessJS(sfc_obj, deps=[]) {
 			let ds = deps.slice();
 			ds.push(child_sfc_url);
 
-			// if no cached, load sfc
+			// load sfc
 			let child_sfc_src = await downloadSFC(child_sfc_url);
 			let [child_sfc_code, child_sfc_obj] = await transpileSFC(child_sfc_src, ds);
 			child_sfc_obj.url = child_sfc_url;
@@ -425,19 +425,12 @@ async function preprocessJS(sfc_obj, deps=[]) {
 		} else {
 			console.log(`cached: ${child_sfc_url}`); // DEBUG
 		}
-		return true;
-	})).catch(error => {
-		throw error;
-	});
 
-
-	// replace .vue path with blob url
-	_jsText = await asyncStringReplace(_jsText, re, async (txt, path) => {
-		let url = resolveUrl(path);
-		let cache = await Promise.resolve(cachedSFCs[url]);
-		new_txt = txt.replace(path, cache.blob_url);
-		console.log(`${txt} ====> ${new_txt}`); // DEBUG
-		return new_txt;
+		// replace import statement from relative path to blob url
+		let cache = await Promise.resolve(cachedSFCs[child_sfc_url]);
+		new_str = match.replace(path, cache.blob_url);
+		console.log(`${match} ====> ${new_str}`); // DEBUG
+		return new_str;
 	});
 
 	js.jsText = _jsText;
@@ -455,7 +448,7 @@ async function preprocessJS(sfc_obj, deps=[]) {
 		let i = 0;
 		while ((match = regex.exec(str)) !== null) {
 			sections.push(str.slice(i, match.index));
-			sections.push(aReplacer(...match));
+			sections.push(aReplacer(...match, match.index, match.input));
 			i = regex.lastIndex;
 		}
 		sections.push(str.slice(i));
