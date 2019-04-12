@@ -591,16 +591,10 @@ async function registerRootSFCs() {
 }
 
 /**
- * Module Initialization
+ * Hook Vue's warnhandler
+ * Mute 'Unknown Element' warnings of our SFCs
  */
-function init() {
-
-	if (!Vue) {
-		console.error('[Vueify]: Need Vue to run.');
-		return;
-	}
-
-	/* Hook Vue's warnhandler */
+function muteVueWarnings() {
 	const _warnHandler = Vue.config.warnHandler;
 	const hasConsole = typeof console !== 'undefined';
 	Vue.config.warnHandler = function(msg, vm, trace) {
@@ -622,7 +616,18 @@ function init() {
 			}
 		}
 	}
+}
 
+/**
+ * Module Initialization
+ */
+function init() {
+	if (!Vue) {
+		console.error('[Vueify]: Need Vue to run.');
+		return;
+	}
+
+	muteVueWarnings();
 	registerRootSFCs();
 }
 
