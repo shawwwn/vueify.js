@@ -432,7 +432,7 @@ async function preprocessJS(sfc_obj, deps=[]) {
 
 
 	// replace .vue path with blob url
-	_jsText = await replace_async(_jsText, re, async (txt, path, pos) => {
+	_jsText = await asyncStringReplace(_jsText, re, async (txt, path) => {
 		let url = resolveUrl(path);
 		let cache = await Promise.resolve(cachedSFCs[url]);
 		new_txt = txt.replace(path, cache.blob_url);
@@ -443,17 +443,25 @@ async function preprocessJS(sfc_obj, deps=[]) {
 	js.jsText = _jsText;
 	return js;
 
-	// Async string replace
-	// TODO: rewrite for a more efficient version
-	async function replace_async(str, re, cb_async) {
-		let ps = [];
-		str.replace(re, (match, ...args) => {
-			let p = cb_async(match, ...args);
-			ps.push(p);
-		});
-		let data = await Promise.all(ps);
-		return str.replace(re, () => data.shift());
-	}
+	/**
+	 * Async version of `string.prototype.replace`
+	 * Modified from Jason Yu: 
+	 * https://gist.github.com/ycmjason/370f9a476648b0a8ce6130e1cb0c2893
+	 */
+	async function asyncStringReplace(str, regex, aReplacer) {
+		regex = new RegExp(regex, regex.flags + (regex.flags.includes('g') ? '': 'g'));
+		let sections = [];
+		let match;
+		let i = 0;
+		while ((match = regex.exec(str)) !== null) {
+			sections.push(str.slice(i, match.index));
+			sections.push(aReplacer(...match));
+			i = regex.lastIndex;
+		}
+		sections.push(str.slice(i));
+
+		return (await Promise.all(sections)).join('');
+	};
 }
 
 /**
