@@ -73,7 +73,7 @@ function getContent(url, callback) {
 		if (xhr.status>=200 && xhr.status<300) {
 			callback(xhr.responseText);
 		} else {
-			console.log(`Failed to load ${url}!`); // DEBUG
+			throw new VueifyJSError(`Failed to load ${url}!`);
 		}
 	};
 	xhr.open('GET', url, true);
@@ -251,7 +251,7 @@ function findSFC(callback) {
  * @return sfc_src
  */
 function downloadSFC(sfc_url) {
-	console.log(`download: ${sfc_url}`); // DEBUG
+	// console.log(`download: ${sfc_url}`); // DEBUG
 	return new Promise(resolve => {
 		getContent(sfc_url, (sfc_src) => {
 			resolve(sfc_src);
@@ -305,7 +305,7 @@ async function preprocessCSS(sfc_obj) {
 			// generate scopeId
 			if (!_scopeId) {
 				_scopeId = genScopeId();
-				console.log("scopeId:", _scopeId); // DEBUG
+				// console.log("scopeId:", _scopeId); // DEBUG
 			}
 
 			// create temporary iframe to hold & parse css text
@@ -378,7 +378,7 @@ var cachedSFCs = {}; // { url : {blob_url, sfc_obj} }
  * @return input JS object
  */
 async function preprocessJS(sfc_obj, deps=[]) {
-	console.log('dependency stack', deps); // DEBUG
+	// console.log('dependency stack', deps); // DEBUG
 	var js = sfc_obj.js;
 
 	// get content only from last script tag
@@ -400,7 +400,7 @@ async function preprocessJS(sfc_obj, deps=[]) {
 	_jsText = await asyncStringReplace(_jsText, re, async(match, path, offset, txt) => {
 
 		let child_sfc_url = resolveUrl(path);
-		console.log(`found child: ${child_sfc_url}`); // DEBUG
+		// console.log(`found child: ${child_sfc_url}`); // DEBUG
 
 		// check cyclic dependency
 		if (deps.indexOf(child_sfc_url) != -1) {
@@ -416,7 +416,7 @@ async function preprocessJS(sfc_obj, deps=[]) {
 		// replace import statement from relative path to blob url
 		let cache = await Promise.resolve(cachedSFCs[child_sfc_url]);
 		new_str = match.replace(path, cache.blob_url);
-		console.log(`${match} ====> ${new_str}`); // DEBUG
+		// console.log(`${match} ====> ${new_str}`); // DEBUG
 		return new_str;
 	});
 
@@ -461,7 +461,7 @@ async function uploadSFC(sfc_code) {
  * @return {string, object}
  */
 async function transpileSFC(sfc_src, deps=[]) {
-	console.log('transpile:', deps[deps.length-1]); // DEBUG
+	// console.log('transpile:', deps[deps.length-1]); // DEBUG
 	let sfc_obj = await parseSFC(sfc_src);
 	await preprocessCSS(sfc_obj);
 	await preprocessHTML(sfc_obj);
@@ -578,14 +578,14 @@ async function registerRootSFCs(VueClass) {
 
 		return async function() {
 			sfc_url = resolveUrl(sfc_url);
-			console.log(`found: ${sfc_url}`); // DEBUG
+			// console.log(`found: ${sfc_url}`); // DEBUG
 
 			await importSFC(sfc_url, [sfc_url]);
 			let sfc_obj = await Promise.resolve(cachedSFCs[sfc_url]);
 
 			// register as global components
 			if (!rootSFCs.includes(sfc_obj)) {
-				console.log(`register: ${sfc_url}`); // DEBUG
+				// console.log(`register: ${sfc_url}`); // DEBUG
 				rootSFCs.push(sfc_obj);
 				new_sfcs.push(sfc_obj);
 				sfc_obj.name = sfc_name;
