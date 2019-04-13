@@ -1,20 +1,22 @@
 // Dynamic.vue
 <style scoped>
-  .blue {
-    color: blue;
+  .orange {
+    color: orange;
+  }
+  .teal {
+    color: teal;
   }
 </style>
 
 <template>
-  <h1 class="blue">{{msg}}</h1>
+  <h1 :class="color">{{msg}}</h1>
 </template>
 
 <script>
 export default {
+  props: ['msg', 'color'],
   data () {
-    return {
-      msg: 'I am dynamically imported!'
-    }
+    return {};
   },
 }
 </script>

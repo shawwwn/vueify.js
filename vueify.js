@@ -565,8 +565,11 @@ var muteNames = []; // mute if these names ever appear in Vue's warnings
  * 
  * Must be called right after Vue.js is loaded, because Vue stops registering
  * components if left running for a short while. (reason is unknown)
+ *
+ * @return [{Object}], newly registered SFC objs
  */
-async function registerRootSFCs() {
+async function registerRootSFCs(VueClass) {
+	var new_sfcs = [];
 
 	// scan script tags to find SFCs
 	await findSFC((sfc_dom, sfc_url, sfc_name) => {
@@ -584,16 +587,17 @@ async function registerRootSFCs() {
 			if (!rootSFCs.includes(sfc_obj)) {
 				console.log(`register: ${sfc_url}`); // DEBUG
 				rootSFCs.push(sfc_obj);
+				new_sfcs.push(sfc_obj);
 				sfc_obj.name = sfc_name;
 				sfc_obj.is_root = true;
-				Vue.component(sfc_name, sfc_obj.module.default);
+				VueClass.component(sfc_name, sfc_obj.module.default);
 			}
 
 			// workaround for https://github.com/vuejs/vue-devtools/issues/969
-			let global_components = Object.getPrototypeOf(Vue.options.components);
+			let global_components = Object.getPrototypeOf(VueClass.options.components);
 			if (global_components != null) {
-				global_components[sfc_name] = Vue.options.components[sfc_name];
-				delete Vue.options.components[sfc_name];
+				global_components[sfc_name] = VueClass.options.components[sfc_name];
+				delete VueClass.options.components[sfc_name];
 			}
 
 			sfc_dom.remove();
@@ -603,16 +607,18 @@ async function registerRootSFCs() {
 
 	// update all Vue instances
 	scanRoot((vue) => vue.$forceUpdate());
+
+	return new_sfcs;
 }
 
 /**
  * Hook Vue's warnhandler
  * Mute 'Unknown Element' warnings of our SFCs
  */
-function muteVueWarnings() {
-	const _warnHandler = Vue.config.warnHandler;
+function muteVueWarnings(VueClass) {
+	const _warnHandler = VueClass.config.warnHandler;
 	const hasConsole = typeof console !== 'undefined';
-	Vue.config.warnHandler = function(msg, vm, trace) {
+	VueClass.config.warnHandler = function(msg, vm, trace) {
 		let mute = false;
 		if (msg.indexOf('Unknown custom element:') == 0) {
 			for (var i=0; i<muteNames.length; i++) {
@@ -633,49 +639,34 @@ function muteVueWarnings() {
 	}
 }
 
-/**
- * Module Initialization
- */
-function init() {
-	if (!window.Vue) {
-		throw new VueifyJSError('Need Vue to run.');
-	}
 
-	muteVueWarnings();
-	registerRootSFCs();
-}
-
-//
-// main
-//
-init();
 
 //
 // module export - start
 //
 return {
-	// optional exports
-	importModule,
-	findSFC,
-	downloadSFC,
-	parseSFC,
-	preprocessCSS,
-	preprocessHTML,
-	preprocessJS,
-	uploadSFC,
-	init,
+	// as a Vue plugin
+	install: function(VueClass) {
+		this._Vue = VueClass;
+		muteVueWarnings(VueClass);
+		registerRootSFCs(VueClass);
+
+		VueClass.importSFC = this.importSFC;
+		VueClass.registerRootSFCs = this.registerRootSFCs;
+	},
 
 	// core exports
-	importSFC,
-	transpileSFC,
-	registerRootSFCs,
-	rootSFCs,
-	cachedSFCs,
-	muteNames,
+	importSFC: importSFC,
+	registerRootSFCs: function() {
+		if (!this._Vue) { throw new VueifyJSError("Need Vue to run!"); }
+		return registerRootSFCs(this._Vue);
+	},
+	_Vue: null,
+	_rootSFCs: rootSFCs,
+	_cachedSFCs: cachedSFCs,
+	_muteNames: muteNames,
 };
 }());
 //
 // module export - end
 //
-
-

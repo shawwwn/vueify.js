@@ -10,10 +10,10 @@
 	<body>
 		<p><i>Dynamically Import .vue file</i></p>
 		<br>
-		<p>Below should display <u>I am dynamically imported!</u> x2.</p>
+		<p>Call <u>Vue.importSFC('./*.vue')</u> to dynamically import a Vue SFC</p>
 		<div id="components-demo">
-			<d1></d1>
-			<d2></d2>
+			<d1 msg='I am imported from an async function!' color='orange'></d1>
+			<d2 msg='I am imported from a normal function!' color='teal'></d2>
 		</div>
 	</body>
 
@@ -22,14 +22,14 @@
 	<script type="text/javascript">
 		(async function() {
 
-
-			var module_data = await Vueify.importSFC('./Dynamic.vue');
+			Vue.use(Vueify);
+			var module_data = await Vue.importSFC('./Dynamic.vue');
 
 			var app = new Vue({ 
 				el: '#components-demo',
 				components: {
 					d1: module_data, // import called inside async function
-					d2: () => Vueify.importSFC('./Dynamic.vue'), // import called inside normal function
+					d2: () => Vue.importSFC('./Dynamic.vue'), // import called inside normal function
 				},
 			});
 
