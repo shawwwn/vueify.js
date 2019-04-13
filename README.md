@@ -1,11 +1,11 @@
 # Vueify.js
 
-Browser loading .vue file from script tag. No muss, no fuss!
+A Vue plugin that enables browser loading .vue files from either script tags or dynamic imports.
 
 <img src="https://user-images.githubusercontent.com/4016736/55936265-a29a3200-5bea-11e9-90a7-46bbd762c0c2.png" width="200" height="230" />
 
 ## Description:
-___Tl;dr.___ `Vueify.js` is an attempt to recreate the desired behavior of [Vueify](https://github.com/vuejs/vueify) in browser environment!
+___Tl;dr.___ `Vueify.js` is an attempt to recreate the desired behavior of [Vueify](https://github.com/vuejs/vueify) in browser environment hence suffix with .js to indicate it is a frontend library.
 
 > Vue's [Single-File-Compoment(SFC)](https://vuejs.org/v2/guide/single-file-components.html) is a nice feature allowing modular code and easier code refactorization. However, a SFC **(*.vue)** file needs to be locally compiled into into browser recognizable primitives(js, css, etc.) before shipping to your browser. This process is not at all straight-forward. At the minimium you will need:
 >
@@ -17,19 +17,39 @@ ___Tl;dr.___ `Vueify.js` is an attempt to recreate the desired behavior of [Vuei
 
 
 ## Usage:
-**First include script tags linked to .vue files, then include vueify.js**
 
-Set `type='vue'` for our script tags, because browser won't automatically load content in script tags with unknown type.
- 
+**Include vueify.js to your html, then initialize the plugin with `Vue.use()`.**
+
 ```html
-<script src="Hello.vue" type='vue'></script>
 <script src="vueify.js"></script>
 ```
 
-SFC loaded this way will be registered globally under the its file name (e.g., Hello.vue ==> hello) or the name user specified in script tag.
-  
-```html
+```js
+Vue.use(Vueify);
+var app = new Vue({ ... });
+```
+
+**Static Loading .vue file via \<script\> and register it as a global component**
+
+*Set `type='vue'` for our script tags, because browser won't automatically load content in script tags with unknown type.*
+
+ ```html
+<script src="Hello.vue" type='vue'></script> // component name with be default to 'hello'
 <script src="Hello.vue" type='vue' name='custom-name'></script>
+```
+
+**Dynamic Loading .vue file**
+
+*Just like `import()` but works with \*.vue*
+
+```js
+var component1_option = await Vue.importSFC('./component1.vue');
+var app = new Vue({
+  components: {
+    component1: component1_option,
+    component2: () => Vue.importSFC('./component2.vue'),
+  },
+}
 ```
 
 
@@ -41,7 +61,7 @@ It then downloads and transpiles these .vue files and their dependent .vue files
 We refer to .vue files inside script tags as root-level therefore they will be automatically loaded as global Vue components by `vueify.js`. Users are responsible for registering any children Vue component inside these .vue files.
 
 
-## Example:
+## Minimum Example:
 Write your Vue component like this:
 ```html
 // Hello.vue
@@ -89,7 +109,6 @@ Then write your html like this:
 
 
 ## Note: 
-* Please verify that `vueify.js` loads after `vue.js` and `*.vue`.
 * No custom lang support ~~lang="coffee"~~ in .vue.
 * Use ES6's `import/export` for nested components, CommonJS's `require/module.exports` is not currently supported.
 * Cyclic dependency in .vue file will cause transpile error.
