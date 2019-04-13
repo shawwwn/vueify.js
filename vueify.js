@@ -405,8 +405,13 @@ async function preprocessJS(sfc_obj, deps=[]) {
 	// TODO: interact other preprocessors(e.g., babel, if any).
 
 	// search for 'import *.vue' statements and transpile the .vue file
-	const re = /import .+ from ['"`](.*\.vue)["'`]/g
+	const re = /import .+ from ['"`](.*)["'`]/g
 	_jsText = await asyncStringReplace(_jsText, re, async(match, path, offset, txt) => {
+		
+		// resolve ESM relative path
+		if (!path.endsWith('.vue')) {
+			return match.replace(path, resolveUrl(path));
+		}
 
 		let child_sfc_url = resolveUrl(path);
 
